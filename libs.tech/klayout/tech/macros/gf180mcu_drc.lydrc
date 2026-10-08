@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Run Klayout DRC</description>
+ <version>0.1</version>
+ <category>drc</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>DRC and LVS</group-name>
+ <menu-path>submenu&gt;end("gf180mcu PDK").end</menu-path>
+ <interpreter>dsl</interpreter>
+ <dsl-interpreter-name>drc-dsl-xml</dsl-interpreter-name>
+ <text>
+# Copyright 2022 GlobalFoundries PDK Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+     require "yaml"
+
+# For some reason klayout messes with the __dir__ path, so it is necessary
+# to use this workaround instead of
+# require_relative "options_helper"
+require File.expand_path("options_helper", File.dirname(__FILE__))
+
+## reading the loaded gds file path
+layout_path = Pathname.new(RBA::CellView.active.filename)
+layout_dir = layout_path.split()[0]
+
+## read saved options from yaml file
+options = option_drc
+
+dir_path = File.dirname(File.expand_path(__FILE__))
+
+if options["top_cell_name"] == ""
+  current_cell_name = RBA::CellView.active.cell.name
+  options["top_cell_name"] = current_cell_name
+end
+
+deck_string = "all"
+deck_string += ",-feol" unless options["feol"]
+deck_string += ",-beol" unless options["beol"]
+deck_string += ",-offgrid" unless options["offgrid"]
+deck_string += ",-density" unless options["density"]
+deck_string += ",-antenna" unless options["antenna"]
+
+# use filename.lyrdb instead of filename.ext
+report_path = layout_path.sub_ext(".lyrdb")
+
+## start running drc
+script_path = File.expand_path("../drc/gf180mcu.drc", File.dirname(__FILE__))
+
+# run the following command in the background,
+     cmd = "klayout -b -r #{script_path} -rd input=#{layout_path} -rd topcell=#{options["top_cell_name"]} -rd report=#{report_path} -rd run_mode=#{options["run_mode"]} -rd verbose=#{options["verbose"]} -rd variant=#{options["variant"]} -rd decks=#{deck_string} -rd threads=#{options["threads"]} -rd workers=#{options["workers"]}"
+
+# Performs a trivial dummy DRC operation purely to probe for user cancellation.
+# KLayout's C++ DRC functions check the cancel flag internally and raise
+# an exception if Cancel has been pressed. There is no other way to
+# detect cancellation from Ruby.
+def check_for_cancel
+  layout = RBA::Layout.new
+  cell = layout.create_cell("TOP")
+  layer = layout.layer(1, 0)
+  cell.shapes(layer).insert(RBA::Box.new(0, 0, 100, 100))
+  source(layout, cell)
+  l = input(1,0)
+  l.width(0.1.um)
+end
+
+puts "Running drc with: #{cmd}"
+
+terminated = false
+
+IO.popen(cmd) do |io|
+  pid = io.pid
+
+  Signal.trap("TERM") do
+    terminated = true
+    begin
+      Process.kill("TERM", pid)
+    rescue Errno::ESRCH
+    end
+  end
+
+  # Thread reading the output of the script
+  reader_thread = Thread.new do
+    begin
+      io.each_line do |line|
+        break if terminated
+        log(line.chomp)
+      end
+    rescue IOError
+      # Pipe closed
+    end
+  end
+
+  # Maintain GUI responsive and check for cancel button
+  begin
+    while reader_thread.alive? and !terminated
+      # Keep UI responsive
+      RBA::Application.instance.process_events
+
+      begin
+        check_for_cancel
+      rescue => e
+        terminated = true
+
+        begin
+          Process.kill("TERM", pid)
+        rescue Errno::ESRCH
+        end
+
+        begin
+          Process.wait(pid)
+        rescue Errno::ECHILD
+        end
+
+        raise e
+      end
+
+      sleep 0.01
+    end
+
+    reader_thread.join
+
+  rescue => e
+    begin
+      Process.kill("TERM", pid)
+    rescue Errno::ESRCH
+    end
+
+    raise e
+  end
+end
+
+exit(143) if terminated
+
+resulting_report = RBA::ReportDatabase.new()
+resulting_report.load(report_path.to_s)
+view = RBA::LayoutView::current
+rdb_index = view.add_rdb(resulting_report)
+view.show_rdb(rdb_index, view.active_cellview_index)
+</text>
+</klayout-macro>

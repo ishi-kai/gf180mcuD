@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Load PDK options</description>
+ <version/>
+ <category/>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>Load PDK options</group-name>
+ <menu-path>submenu&gt;end("gf180mcu PDK").end</menu-path>
+ <interpreter>ruby</interpreter>
+ <dsl-interpreter-name/>
+ <text>
+require 'yaml'
+require 'fileutils'
+require_relative 'options_helper'
+
+include RBA
+
+class OptionMenuBuilder
+  def initialize(mw, get_opts, save_opts, menu_path)
+    @mw = mw
+    @get_opts = get_opts   # Lambda that returns the options hash
+    @save_opts = save_opts # Lambda that accepts the options hash and saves it
+    @menu_path = menu_path
+  end
+
+  def add_string(key, title, prompt_title, prompt_msg, menu_id: nil)
+    action = RBA::Action.new
+    action.title = title
+    action.on_triggered do
+      opts = @get_opts.call
+      new_val = RBA::InputDialog::ask_string(prompt_title, prompt_msg, opts[key])
+      if new_val
+        opts[key] = new_val
+        @save_opts.call(opts)
+      end
+    end
+    @mw.menu.insert_item("#{@menu_path}.end", menu_id || key, action)
+  end
+
+  def add_selection(key, title, options, prompt_title, prompt_msg, default_idx = 1, menu_id: nil)
+    action = RBA::Action.new
+    action.title = title
+    action.on_triggered do
+      opts = @get_opts.call
+      idx = options.index(opts[key])
+      if idx.nil?
+        warn "Error: '#{opts[key]}' not found in selection options. Initial selection will not match."
+        idx = default_idx
+      end
+      selected = RBA::InputDialog::ask_item(prompt_title, prompt_msg, options, idx)
+      if selected
+        opts[key] = selected
+        @save_opts.call(opts)
+      end
+    end
+    @mw.menu.insert_item("#{@menu_path}.end", menu_id || key, action)
+  end
+
+  def add_checkbox(key, title, initial_checked, menu_id: nil)
+    action = RBA::Action.new
+    action.title = title
+    action.checkable = true
+    action.checked = initial_checked
+    action.on_triggered do
+      opts = @get_opts.call
+      opts[key] = action.is_checked?
+      @save_opts.call(opts)
+    end
+    @mw.menu.insert_item("#{@menu_path}.end", menu_id || key, action)
+  end
+end
+
+#####################################################################################
+# Main Plugin Setup
+#####################################################################################
+mw = RBA::MainWindow.instance
+
+# Create menu submenus
+mw.menu.insert_menu("submenu.end", "drc_menu", "Klayout DRC Options")
+mw.menu.insert_menu("submenu.end", "lvs_menu", "Klayout LVS Options")
+mw.menu.insert_separator("submenu.lvs_menu+", "name2")
+
+# Load initial options for checkbox states
+drc_initial = option_drc()
+lvs_initial = option_lvs()
+
+#####################################################################################
+# DRC Options
+#####################################################################################
+drc_builder = OptionMenuBuilder.new(
+  mw,
+  -> { option_drc },
+  ->(opts) { save_option_drc(opts) },
+  "submenu.drc_menu"
+)
+
+drc_builder.add_selection("run_mode", "Run mode", %w[tiling deep flat], "Run mode", "Select run mode:", 1)
+drc_builder.add_selection("variant", "Variant options", %w[A B C D E F], "Variant options", "Select variant option:", 1)
+drc_builder.add_string("top_cell_name", "Top cell name", "Top cell name", "Please enter Top_cell name. Empty means run on current cell.", menu_id: "TOP_cell_name")
+drc_builder.add_checkbox("verbose", "Verbose mode", drc_initial["verbose"])
+drc_builder.add_string("threads", "Number of threads for DRC operations", "Number of threads for DRC operations", "Please enter number of threads to use in klayout DRC functions. 'max' for all available cores.", menu_id: "threads")
+drc_builder.add_string("workers", "Number of parallel DRC rule runs", "Number of parallel DRC rule runs", "Please enter number of parallel DRC workers. More workers mean more required RAM. 'max' for all available cores. For klayout version prior to 0.30.9, please set it to 1.", menu_id: "workers")
+drc_builder.add_checkbox("feol", "FEOL rules", drc_initial["feol"])
+drc_builder.add_checkbox("beol", "BEOL rules", drc_initial["beol"])
+drc_builder.add_checkbox("offgrid", "Offgrid rules", drc_initial["offgrid"])
+drc_builder.add_checkbox("density", "Density rules", drc_initial["density"])
+drc_builder.add_checkbox("offgrid", "Antenna rules", drc_initial["antenna"])
+
+#####################################################################################
+# LVS Options
+#####################################################################################
+lvs_builder = OptionMenuBuilder.new(
+  mw,
+  -> { option_lvs },
+  ->(opts) { save_option_lvs(opts) },
+  "submenu.lvs_menu"
+)
+
+lvs_builder.add_selection("run_mode", "Run mode", %w[tiling deep flat], "Run mode", "Select run mode:", 1)
+lvs_builder.add_selection("variant", "variant options", %w[A B C D], "Variant options", "Select variant option:", 1)
+lvs_builder.add_string("netlist", "Netlist Path", "Netlist Path", "Please enter Netlist Path", menu_id: "Netlist_path")
+lvs_builder.add_string("top_cell_name", "Top_cell name", "Top cell name", "Please enter Top_cell name. Empty means run on current cell.", menu_id: "TOP_cell_name")
+lvs_builder.add_checkbox("verbose", "Verbose mode", lvs_initial["verbose"])
+lvs_builder.add_checkbox("simplify", "Simplify", lvs_initial["simplify"])
+lvs_builder.add_checkbox("net_only", "Netlist only", lvs_initial["net_only"])
+lvs_builder.add_checkbox("top_lvl_pins", "Top level pins", lvs_initial["top_lvl_pins"])
+lvs_builder.add_checkbox("combine", "Devices combine", lvs_initial["combine"])
+lvs_builder.add_checkbox("purge", "Purge", lvs_initial["purge"])
+lvs_builder.add_checkbox("purge_nets", "Purge nets", lvs_initial["purge_nets"])
+lvs_builder.add_checkbox("implicit_connect", "Globally connect nets with identical name", lvs_initial["implicit_connect"])
+lvs_builder.add_checkbox("schematic_translate", "Translate input spice schematic to klayout dialect", lvs_initial["schematic_translate"])
+
+</text>
+</klayout-macro>

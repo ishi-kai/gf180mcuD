@@ -1,0 +1,12 @@
+---
+run_mode: deep
+variant: D
+top_cell_name: ''
+verbose: false
+threads: 'max'
+workers: '1'
+feol: true
+beol: true
+offgrid: true
+density: true
+antenna: true
