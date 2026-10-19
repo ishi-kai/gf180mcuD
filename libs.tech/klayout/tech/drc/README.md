@@ -38,3 +38,24 @@ You could view it on your file using: `klayout <input_gds_file> -m <resut_db_fil
 ![image](https://user-images.githubusercontent.com/91015308/219004873-be7c1e81-7085-4e82-8cd4-8303bc021e13.png)
 
 
+
+## RISC-V Day MPW inverter DUT checks (`inv_dut` deck)
+
+`rule_decks/inv_dut.rb` checks an inverter DUT layout against the reference frame
+`inv_dut/inverter_base.gds`. It is **not** part of `all` and must be selected explicitly.
+For the MPW submission flow, density rules are excluded:
+
+```bash
+klayout -b -r gf180mcu.drc -rd input=inv_dut_000.gds -rd topcell=inv_dut_000 \
+  -rd report=inv_dut_000.lyrdb -rd decks=all,-density,inv_dut
+```
+
+| Rule        | Description |
+|-------------|-------------|
+| `INV.PRB.1` | PR_BNDRY (0/0) must be identical to the reference (center (0,0), 20um x 50um). |
+| `INV.BND.1` | No shapes or labels outside the PR_BNDRY area. |
+| `INV.M1.1`  | Metal1 of the VDD/VSS/A/Q pins must not be removed or modified. |
+| `INV.LBL.1` | Metal1 labels VDD/VSS/A/Q (34/10) must not be removed, renamed or moved. |
+| `INV.LBL.2` | No additional Metal1 labels (34/10). |
+
+The reference GDS can be overridden with `-rd inv_dut_base=<path>`.
