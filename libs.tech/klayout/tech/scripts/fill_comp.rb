@@ -18,12 +18,9 @@ fill_shape = RBA::DBox::new(-2.5, -2.5, 2.5, 2.5)
 fill_layer = COMP_Dummy
 fc_name = "COMP_fill_cell"
 
-fill_cell = $ly.cell(fc_name)
-if ! fill_cell
-  fill_cell = $ly.create_cell(fc_name)
-  fill_shape_in_dbu = $micron2dbu * fill_shape
-  fill_cell.shapes(fill_layer).insert(fill_shape_in_dbu)
-end
+fill_cell = $ly.create_cell(fc_name)
+fill_shape_in_dbu = $micron2dbu * fill_shape
+fill_cell.shapes(fill_layer).insert(fill_shape_in_dbu)
 
 fc_box_in_dbu = $micron2dbu * fc_box
 fc_origin_in_dbu = $micron2dbu * fc_origin
@@ -82,13 +79,22 @@ tp.var("space_to_LVPWELL", 1.3 / $ly.dbu)
 tp.var("space_to_Dualgate", 1.3 / $ly.dbu)
 
 # DCF.7a
-tp.var("space_to_scribe_line", 26 / $ly.dbu)
+# Check no_scribe_line argument
+no_scribe_line = defined?($no_scribe_line) && $no_scribe_line == "true"
+
+if no_scribe_line
+  # Skip scribe line margin spacing
+  tp.var("space_to_scribe_line", 0 / $ly.dbu)
+else
+  # Default scribe margin
+  tp.var("space_to_scribe_line", 26 / $ly.dbu)
+end
 
 # DCF.8a
 tp.var("space_to_RES_MK", 3.5 / $ly.dbu)
 
-# DCF.9
-tp.var("space_to_Pad", 7 / $ly.dbu)
+# DCF.9 (guideline for RF circuits, actual 7um, chosen 5um)
+tp.var("space_to_Pad", 5 / $ly.dbu)
 
 # DCF.11a
 tp.var("space_to_NDMY", 3.5 / $ly.dbu)
