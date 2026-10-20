@@ -84,10 +84,12 @@ mw = RBA::MainWindow.instance
 
 # Create menu submenus
 mw.menu.insert_menu("submenu.end", "drc_menu", "Klayout DRC Options")
-mw.menu.insert_separator("submenu.drc_menu+", "name2")
+mw.menu.insert_menu("submenu.end", "lvs_menu", "Klayout LVS Options")
+mw.menu.insert_separator("submenu.lvs_menu+", "name2")
 
 # Load initial options for checkbox states
 drc_initial = option_drc()
+lvs_initial = option_lvs()
 
 #####################################################################################
 # DRC Options
@@ -111,6 +113,30 @@ drc_builder.add_checkbox("offgrid", "Offgrid rules", drc_initial["offgrid"])
 drc_builder.add_checkbox("density", "Density rules", drc_initial["density"])
 drc_builder.add_checkbox("antenna", "Antenna rules", drc_initial["antenna"])
 drc_builder.add_checkbox("inv_dut", "Inverter DUT frame rules", drc_initial.fetch("inv_dut", true))
+
+#####################################################################################
+# LVS Options
+#####################################################################################
+lvs_builder = OptionMenuBuilder.new(
+  mw,
+  -> { option_lvs },
+  ->(opts) { save_option_lvs(opts) },
+  "submenu.lvs_menu"
+)
+
+lvs_builder.add_selection("run_mode", "Run mode", %w[tiling deep flat], "Run mode", "Select run mode:", 1)
+lvs_builder.add_selection("variant", "variant options", %w[A B C D], "Variant options", "Select variant option:", 1)
+lvs_builder.add_string("netlist", "Netlist Path", "Netlist Path", "Please enter Netlist Path", menu_id: "Netlist_path")
+lvs_builder.add_string("top_cell_name", "Top_cell name", "Top cell name", "Please enter Top_cell name. Empty means run on current cell.", menu_id: "TOP_cell_name")
+lvs_builder.add_checkbox("verbose", "Verbose mode", lvs_initial["verbose"])
+lvs_builder.add_checkbox("simplify", "Simplify", lvs_initial["simplify"])
+lvs_builder.add_checkbox("net_only", "Netlist only", lvs_initial["net_only"])
+lvs_builder.add_checkbox("top_lvl_pins", "Top level pins", lvs_initial["top_lvl_pins"])
+lvs_builder.add_checkbox("combine", "Devices combine", lvs_initial["combine"])
+lvs_builder.add_checkbox("purge", "Purge", lvs_initial["purge"])
+lvs_builder.add_checkbox("purge_nets", "Purge nets", lvs_initial["purge_nets"])
+lvs_builder.add_checkbox("implicit_connect", "Globally connect nets with identical name", lvs_initial["implicit_connect"])
+lvs_builder.add_checkbox("schematic_translate", "Translate input spice schematic to klayout dialect", lvs_initial["schematic_translate"])
 
 </text>
 </klayout-macro>
