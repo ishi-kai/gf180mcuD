@@ -50,6 +50,11 @@ klayout -b -r gf180mcu.drc -rd input=inv_dut_000.gds -rd topcell=inv_dut_000 \
   -rd report=inv_dut_000.lyrdb -rd decks=all,-density,inv_dut
 ```
 
+In the KLayout GUI, `gf180mcu PDK > Run Klayout DRC` runs the same checks by default.
+The macro adds `inv_dut` to the decks while the **Inverter DUT frame rules** option is on
+(default: on) and excludes density rules while the **Density rules** option is off
+(default: off). Both options are in `gf180mcu PDK > Klayout DRC Options`.
+
 | Rule        | Description |
 |-------------|-------------|
 | `INV.PRB.1` | PR_BNDRY (0/0) must be identical to the reference (center (0,0), 20um x 50um). |

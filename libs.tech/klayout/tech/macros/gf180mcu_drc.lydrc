@@ -57,6 +57,8 @@ deck_string += ",-beol" unless options["beol"]
 deck_string += ",-offgrid" unless options["offgrid"]
 deck_string += ",-density" unless options["density"]
 deck_string += ",-antenna" unless options["antenna"]
+# RISC-V Day MPW inverter DUT frame checks (not part of "all")
+deck_string += ",inv_dut" if options.fetch("inv_dut", true)
 
 # use filename.lyrdb instead of filename.ext
 report_path = layout_path.sub_ext(".lyrdb")
