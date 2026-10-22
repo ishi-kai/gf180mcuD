@@ -29,6 +29,12 @@ logger.info('Starting GF180 LVS connectivity setup')
 # %include general_connections.lvs
 
 #================================
+# ---- BUTTING CONNECTIONS ------
+#================================
+
+# %include butting_connections.lvs
+
+#================================
 # ----- MOSFET CONNECTIONS ------
 #================================
 
